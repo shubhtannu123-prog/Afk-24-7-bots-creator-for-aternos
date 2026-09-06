@@ -13,8 +13,8 @@
   },
 
   "server": {
-    "ip": "DurgaViharColony.aternos.me",
-    "port": 44643,
+    "ip": "hardlifesteal.mcsh.io",
+    "port": 25565,
     "version": "1.20.1",
     "try-creative": false
   },
