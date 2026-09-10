@@ -1,22 +1,24 @@
 {
-  "bots": [
-    "Chomubot",
-    "ChomiBot",
-    "Samosa",
-    "Dahi"
-    
+  "servers": [
+    {
+      "name": "Aternos",
+      "ip": "DurgaViharColony.aternos.me",
+      "port": 44643,
+      "version": "1.20.1",
+      "auth": "offline",
+
+      "bots": [
+        "Chomubot",
+        "ChowminBot"
+      ]
+    }
   ],
 
-  "bot-account": {
-    "type": "offline",
-    "password": ""
-  },
-
-  "server": {
-    "ip": "DurgaViharColony.aternos.me:44643",
-    "port": 44643,
-    "version": "1.20.1",
-    "try-creative": false
+  "position": {
+    "enabled": true,
+    "x": 0,
+    "y": 100,
+    "z": 0
   },
 
   "utils": {
@@ -26,6 +28,7 @@
     },
 
     "anti-afk": {
+      "enabled": true,
       "sneak": true
     },
 
@@ -41,7 +44,7 @@
     "chat-log": true,
 
     "auto-reconnect": true,
-    "auto-reconnect-delay": 15000,
+    "auto-reconnect-delay": 2000,
     "max-reconnect-delay": 120000
   },
 
@@ -51,19 +54,21 @@
     "circle-walk": {
       "enabled": true,
       "radius": 4,
-      "speed": 2500,
+      "speed": 500,
       "step-blocks": 2,
-      "turn": "right"
+      "max-step-time": 4000,
+      "turn": "right",
+      "turn-pause": 150
     },
 
     "look-around": {
       "enabled": true,
-      "interval": 15000
+      "interval": 5000
     },
 
     "random-jump": {
       "enabled": true,
-      "interval": 30000
+      "interval": 10000
     }
   },
 
@@ -79,7 +84,7 @@
     "attack-mobs": true,
     "auto-eat": true,
     "attack-range": 3.5,
-    "attack-delay": 1500
+    "attack-delay": 1000
   },
 
   "beds": {
@@ -87,13 +92,10 @@
     "place-night": false
   },
 
-  "performance": {
-    "disablePhysics": false
-  },
-
   "discord": {
     "enabled": false,
     "webhookUrl": "",
+
     "events": {
       "connect": true,
       "disconnect": true,
@@ -103,5 +105,12 @@
 
   "chat": {
     "respond": true
+  },
+
+  "performance": {
+    "viewDistance": 2,
+    "physicsEnabled": false,
+    "connectTimeout": 30000,
+    "checkTimeoutInterval": 30000
   }
 }
