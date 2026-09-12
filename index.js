@@ -2912,18 +2912,6 @@ app.get(
   }
 );
 // ============================================================
-// UPTIMEROBOT / RENDER KEEP-ALIVE
-// ============================================================
-
-app.get("/keepalive", (req, res) => {
-  res.set("Cache-Control", "no-store");
-  res.status(200).json({
-    success: true,
-    message: "Backend is awake",
-    timestamp: new Date().toISOString()
-  });
-});
-// ============================================================
 // HEALTH CHECK ROUTE
 // ============================================================
 
