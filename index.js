@@ -2067,27 +2067,22 @@ async function startBot(
       `[${state.serverName}] [${state.botName}] connecting to ${state.host}:${state.port}...`
     );
 
-    const options = {
-
-      host:
-        state.host,
-
-      port:
-        state.port,
-
-      username:
-        state.botName,
-
-      auth:
-        state.auth,
-
-      version:
-        state.version,
-
-      password:
-        state.password ||
-        undefined,
-
+const options = {
+  host: state.host,
+  port: state.port,
+  username: state.botName,
+  auth: state.auth,
+  version: state.version,
+  password: state.password || undefined,
+  
+  // Timeout & Keepalive adjustments for Render
+  checkTimeoutInterval: 60000, // Increase from 30s to 60s
+  keepAlive: true,             // Enable TCP keep-alive packets
+  
+  viewDistance: Math.max(2, Number(config.performance?.viewDistance) || 2),
+  physicsEnabled: config.performance?.physicsEnabled !== false,
+  chatLog: false,
+};
       // ------------------------------------------------------
       // WISPBYTE MEMORY PROTECTION
       // ------------------------------------------------------
