@@ -2303,7 +2303,9 @@ app.get(
                 ${
                   state.connected
                     ? "CONNECTED"
-                    : "OFFLINE"
+                    : state.connecting
+                      ? "CONNECTING"
+                      : "OFFLINE"
                 }
               </span>
 
@@ -2324,28 +2326,28 @@ app.get(
             <div class="actions">
 
               <button
-                onclick="act(
-                  '/start',
-                  '${escapeHTML(
-                    state.serverName
-                  )}',
-                  '${escapeHTML(
-                    state.botName
-                  )}'
-                )">
+                type="button"
+                class="bot-action"
+                data-action="/start"
+                data-server="${escapeHTML(
+                  state.serverName
+                )}"
+                data-bot="${escapeHTML(
+                  state.botName
+                )}">
                 Start
               </button>
 
               <button
-                onclick="act(
-                  '/stop',
-                  '${escapeHTML(
-                    state.serverName
-                  )}',
-                  '${escapeHTML(
-                    state.botName
-                  )}'
-                )">
+                type="button"
+                class="bot-action"
+                data-action="/stop"
+                data-server="${escapeHTML(
+                  state.serverName
+                )}"
+                data-bot="${escapeHTML(
+                  state.botName
+                )}">
                 Stop
               </button>
 
@@ -2357,6 +2359,11 @@ app.get(
       html +=
         `</section>`;
     }
+
+    res.set(
+      "Cache-Control",
+      "no-store, no-cache, must-revalidate, proxy-revalidate"
+    );
 
     res.send(
       `<!doctype html>
@@ -2420,6 +2427,7 @@ main {
 .top {
   display: flex;
   justify-content: space-between;
+  gap: 12px;
 }
 
 .top span {
@@ -2437,6 +2445,7 @@ main {
   display: flex;
   gap: 8px;
   margin-top: 12px;
+  flex-wrap: wrap;
 }
 
 button,
@@ -2448,11 +2457,46 @@ a {
   padding: 9px 14px;
   cursor: pointer;
   text-decoration: none;
+  font: inherit;
+  -webkit-tap-highlight-color: transparent;
 }
 
 button:hover,
 a:hover {
   background: #21262d;
+}
+
+button:active,
+a:active {
+  transform: translateY(1px);
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+  transform: none;
+}
+
+#toast {
+  position: fixed;
+  left: 50%;
+  bottom: 22px;
+  transform: translateX(-50%) translateY(20px);
+  background: #161b22;
+  color: #e6edf3;
+  border: 1px solid #30363d;
+  border-radius: 10px;
+  padding: 10px 14px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .18s ease, transform .18s ease;
+  max-width: min(90vw, 700px);
+  z-index: 9999;
+}
+
+#toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
 }
 
 </style>
@@ -2492,58 +2536,326 @@ Setup
 
 </main>
 
+<div
+id="toast"
+role="status"
+aria-live="polite">
+</div>
+
 <script>
 
-async function act(
-  url,
-  server,
-  bot
-) {
+(function () {
 
-  try {
-
-    const response =
-      await fetch(
-        url,
-        {
-          method:
-            "POST",
-
-          headers: {
-            "Content-Type":
-              "application/json"
-          },
-
-          body:
-            JSON.stringify({
-              server,
-              bot
-            })
-        }
-      );
-
-    const data =
-      await response.json();
-
-    alert(
-      data.msg ||
-      "Done"
+  const toast =
+    document.getElementById(
+      "toast"
     );
 
-    location.reload();
+  let toastTimer =
+    null;
 
-  } catch (error) {
+  function showToast(
+    message
+  ) {
 
-    alert(
-      "Request failed."
+    if (!toast) {
+      return;
+    }
+
+    toast.textContent =
+      String(message || "");
+
+    toast.classList.add(
+      "show"
+    );
+
+    clearTimeout(
+      toastTimer
+    );
+
+    toastTimer =
+      setTimeout(
+        () => {
+          toast.classList.remove(
+            "show"
+          );
+        },
+        2800
+      );
+  }
+
+  function sleep(
+    ms
+  ) {
+    return new Promise(
+      resolve =>
+        setTimeout(
+          resolve,
+          ms
+        )
     );
   }
-}
 
-setTimeout(
-  () => location.reload(),
-  10000
-);
+  async function requestAction(
+    url,
+    server,
+    bot
+  ) {
+
+    let lastError =
+      null;
+
+    for (
+      let attempt = 0;
+      attempt < 3;
+      attempt++
+    ) {
+
+      const controller =
+        new AbortController();
+
+      const timeout =
+        setTimeout(
+          () =>
+            controller.abort(),
+          20000
+        );
+
+      try {
+
+        const response =
+          await fetch(
+            url,
+            {
+              method:
+                "POST",
+
+              headers: {
+                "Content-Type":
+                  "application/json",
+                "Accept":
+                  "application/json"
+              },
+
+              cache:
+                "no-store",
+
+              credentials:
+                "same-origin",
+
+              body:
+                JSON.stringify({
+                  server,
+                  bot
+                }),
+
+              signal:
+                controller.signal
+            }
+          );
+
+        const contentType =
+          response.headers.get(
+            "content-type"
+          ) || "";
+
+        const raw =
+          await response.text();
+
+        if (
+          contentType.includes(
+            "application/json"
+          )
+        ) {
+
+          let data;
+
+          try {
+            data =
+              JSON.parse(raw);
+          } catch (error) {
+            lastError =
+              new Error(
+                "Server returned invalid JSON."
+              );
+          }
+
+          if (data) {
+
+            if (
+              !response.ok
+            ) {
+
+              throw new Error(
+                data.msg ||
+                "Request failed (" +
+                response.status +
+                ")."
+              );
+            }
+
+            return data;
+          }
+
+        } else {
+
+          lastError =
+            new Error(
+              response.status === 503 ||
+              response.status === 502
+                ? "Render is waking the service..."
+                : "Unexpected server response (" +
+                  response.status +
+                  ")."
+            );
+        }
+
+      } catch (error) {
+
+        lastError =
+          error?.name === "AbortError"
+            ? new Error(
+                "The request timed out."
+              )
+            : error;
+
+      } finally {
+
+        clearTimeout(
+          timeout
+        );
+      }
+
+      // A sleeping Render service can return
+      // a wake-up page before the Node app is ready.
+      if (
+        attempt < 2
+      ) {
+
+        showToast(
+          attempt === 0
+            ? "Connecting to the bot service..."
+            : "Retrying..."
+        );
+
+        await sleep(
+          4500
+        );
+      }
+    }
+
+    throw (
+      lastError ||
+      new Error(
+        "Request failed."
+      )
+    );
+  }
+
+  async function act(
+    button
+  ) {
+
+    if (
+      !button ||
+      button.disabled
+    ) {
+      return;
+    }
+
+    const url =
+      button.dataset.action;
+
+    const server =
+      button.dataset.server;
+
+    const bot =
+      button.dataset.bot;
+
+    if (
+      !url ||
+      !server ||
+      !bot
+    ) {
+
+      showToast(
+        "This button is missing its bot information."
+      );
+
+      return;
+    }
+
+    const originalText =
+      button.textContent.trim();
+
+    button.disabled =
+      true;
+
+    button.textContent =
+      "Working...";
+
+    try {
+
+      const data =
+        await requestAction(
+          url,
+          server,
+          bot
+        );
+
+      showToast(
+        data.msg ||
+        "Done"
+      );
+
+      setTimeout(
+        () =>
+          window.location.reload(),
+        500
+      );
+
+    } catch (error) {
+
+      showToast(
+        error?.message ||
+        "Request failed."
+      );
+
+      button.disabled =
+        false;
+
+      button.textContent =
+        originalText;
+    }
+  }
+
+  // Event delegation means dynamically rendered
+  // buttons remain clickable and there are no
+  // fragile inline onclick handlers.
+  document.addEventListener(
+    "click",
+    event => {
+
+      const button =
+        event.target.closest(
+          ".bot-action"
+        );
+
+      if (
+        !button
+      ) {
+        return;
+      }
+
+      event.preventDefault();
+
+      act(
+        button
+      );
+    }
+  );
+
+})();
 
 </script>
 
@@ -2553,6 +2865,7 @@ setTimeout(
     );
   }
 );
+
 
 // ============================================================
 // HEALTH
@@ -2651,9 +2964,31 @@ app.get(
   "/ping",
   (req, res) => {
 
+    res.set(
+      "Cache-Control",
+      "no-store, no-cache, must-revalidate, proxy-revalidate"
+    );
+
     res.send(
       "pong"
     );
+  }
+);
+
+app.get(
+  "/keepalive",
+  (req, res) => {
+
+    res.set(
+      "Cache-Control",
+      "no-store, no-cache, must-revalidate, proxy-revalidate"
+    );
+
+    res.status(200).json({
+      ok: true,
+      service: "minecraft-bot-dashboard",
+      uptime: Math.floor(process.uptime())
+    });
   }
 );
 
@@ -3156,17 +3491,23 @@ app.post(
       state.manualStop =
         false;
 
-      await startBot(
+      const started = await startBot(
         state
       );
 
-      return res.json({
+      return res.status(started || state.bot || state.connecting ? 200 : 503).json({
 
         success:
-          true,
+          Boolean(started || state.bot || state.connecting),
 
         msg:
-          `${state.serverName} / ${state.botName} start requested.`
+          started
+            ? `${state.serverName} / ${state.botName} start requested.`
+            : state.bot
+              ? `${state.serverName} / ${state.botName} is already running.`
+              : state.connecting
+                ? `${state.serverName} / ${state.botName} is already connecting.`
+                : `${state.serverName} / ${state.botName} could not start; check logs.`
 
       });
     }
