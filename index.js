@@ -1,6 +1,7 @@
 "use strict";
 
 const mineflayer = require("mineflayer");
+
 const {
   Movements,
   pathfinder
@@ -30,6 +31,9 @@ app.use(
   })
 );
 
+// IMPORTANT FOR RENDER:
+// Render supplies process.env.PORT.
+// The fallback is only used when running locally.
 const PORT =
   Number(process.env.PORT) || 5000;
 
@@ -499,7 +503,6 @@ function sendDiscord(
 
           timeout:
             5000
-
         },
 
         response => {
@@ -510,6 +513,15 @@ function sendDiscord(
     request.on(
       "error",
       () => {}
+    );
+
+    request.on(
+      "timeout",
+      () => {
+        try {
+          request.destroy();
+        } catch (_) {}
+      }
     );
 
     request.write(
@@ -689,11 +701,6 @@ function stopMovement(
 // Turn right 90 degrees.
 // Repeat.
 //
-// Distance is checked from the actual
-// Minecraft position instead of relying
-// only on a timer, so it stays closer
-// to the requested 2-block movement.
-//
 
 function startCircleWalk(
   state
@@ -787,6 +794,8 @@ function startCircleWalk(
           500
         );
 
+      state.movementTimer.unref?.();
+
       return;
     }
 
@@ -813,6 +822,8 @@ function startCircleWalk(
           walkStep,
           1000
         );
+
+      state.movementTimer.unref?.();
 
       return;
     }
@@ -904,6 +915,8 @@ function startCircleWalk(
               turnPause
             );
 
+          state.movementTimer.unref?.();
+
           return;
         }
 
@@ -912,6 +925,8 @@ function startCircleWalk(
             checkDistance,
             100
           );
+
+        state.movementTimer.unref?.();
       };
 
     state.movementTimer =
@@ -919,6 +934,8 @@ function startCircleWalk(
         checkDistance,
         100
       );
+
+    state.movementTimer.unref?.();
   }
 
   walkStep();
@@ -1086,27 +1103,30 @@ function startRandomJump(
             true
           );
 
-          setTimeout(
-            () => {
+          const jumpTimer =
+            setTimeout(
+              () => {
 
-              if (
-                !state.bot
-              ) {
-                return;
-              }
+                if (
+                  !state.bot
+                ) {
+                  return;
+                }
 
-              try {
+                try {
 
-                state.bot.setControlState(
-                  "jump",
-                  false
-                );
+                  state.bot.setControlState(
+                    "jump",
+                    false
+                  );
 
-              } catch (_) {}
+                } catch (_) {}
 
-            },
-            150
-          );
+              },
+              150
+            );
+
+          jumpTimer.unref?.();
 
         } catch (_) {}
 
@@ -1196,6 +1216,8 @@ function runAutoAuth(
       },
       2000
     );
+
+  state.authTimer.unref?.();
 }
 
 // ============================================================
@@ -2067,6 +2089,10 @@ async function startBot(
       `[${state.serverName}] [${state.botName}] connecting to ${state.host}:${state.port}...`
     );
 
+    // --------------------------------------------------------
+    // MINEFLAYER OPTIONS
+    // --------------------------------------------------------
+
     const options = {
 
       host:
@@ -2097,7 +2123,8 @@ async function startBot(
         ),
 
       physicsEnabled:
-        config.performance?.physicsEnabled !== false,
+        config.performance?.physicsEnabled !==
+        false,
 
       chatLog:
         false,
@@ -2125,6 +2152,10 @@ async function startBot(
         false
     };
 
+    // --------------------------------------------------------
+    // CREATE BOT
+    // --------------------------------------------------------
+
     const bot =
       mineflayer.createBot(
         options
@@ -2133,9 +2164,17 @@ async function startBot(
     state.bot =
       bot;
 
+    // --------------------------------------------------------
+    // PATHFINDER
+    // --------------------------------------------------------
+
     bot.loadPlugin(
       pathfinder
     );
+
+    // --------------------------------------------------------
+    // EVENTS
+    // --------------------------------------------------------
 
     registerEvents(
       state,
@@ -2175,6 +2214,7 @@ async function startBot(
       false;
   }
 }
+
 // ============================================================
 // STOP BOT
 // ============================================================
@@ -2528,6 +2568,10 @@ Health
 Setup
 </a>
 
+<a href="/ping">
+Ping
+</a>
+
 </div>
 
 </main>
@@ -2629,6 +2673,7 @@ aria-live="polite">
               headers: {
                 "Content-Type":
                   "application/json",
+
                 "Accept":
                   "application/json"
               },
@@ -2667,16 +2712,23 @@ aria-live="polite">
           let data;
 
           try {
+
             data =
-              JSON.parse(raw);
-          } catch (error) {
+              JSON.parse(
+                raw
+              );
+
+          } catch (_) {
+
             lastError =
               new Error(
                 "Server returned invalid JSON."
               );
           }
 
-          if (data) {
+          if (
+            data
+          ) {
 
             if (
               !response.ok
@@ -2722,8 +2774,6 @@ aria-live="polite">
         );
       }
 
-      // A sleeping Render service can return
-      // a wake-up page before the Node app is ready.
       if (
         attempt < 2
       ) {
@@ -2825,9 +2875,6 @@ aria-live="polite">
     }
   }
 
-  // Event delegation means dynamically rendered
-  // buttons remain clickable and there are no
-  // fragile inline onclick handlers.
   document.addEventListener(
     "click",
     event => {
@@ -2862,91 +2909,40 @@ aria-live="polite">
   }
 );
 
-
 // ============================================================
-// HEALTH
+// HEALTH CHECK
+// UPTIMEROBOT USES THIS ROUTE
+// ============================================================
+//
+// IMPORTANT:
+// Keep this route lightweight. It does not inspect bots,
+// databases, Minecraft state, etc.
+//
+// UptimeRobot URL:
+//
+// https://YOUR-RENDER-SERVICE.onrender.com/health
+//
 // ============================================================
 
 app.get(
   "/health",
   (req, res) => {
 
-    const result =
-      {};
-
-    for (
-      const state
-      of states.values()
-    ) {
-
-      const pos =
-        state.bot
-          ?.entity
-          ?.position;
-
-      result[
-        state.key
-      ] = {
-
-        server:
-          state.serverName,
-
-        bot:
-          state.botName,
-
-        host:
-          state.host,
-
-        port:
-          state.port,
-
-        status:
-          state.connected
-            ? "connected"
-            : "disconnected",
-
-        connecting:
-          state.connecting,
-
-        uptime:
-          getUptime(
-            state
-          ),
-
-        coords:
-          pos
-            ? {
-                x:
-                  Number(pos.x),
-
-                y:
-                  Number(pos.y),
-
-                z:
-                  Number(pos.z)
-              }
-            : null,
-
-        reconnectAttempts:
-          state.reconnectAttempts,
-
-        errors:
-          state.errors
-      };
-    }
-
     res.set(
       "Cache-Control",
-      "no-store"
+      "no-store, no-cache, must-revalidate, proxy-revalidate"
     );
 
-    res.json({
+    return res.status(200).json({
 
-      count:
-        states.size,
+      success:
+        true,
 
-      bots:
-        result
+      message:
+        "Server is healthy",
+
+      timestamp:
+        new Date().toISOString()
 
     });
   }
@@ -2965,11 +2961,15 @@ app.get(
       "no-store, no-cache, must-revalidate, proxy-revalidate"
     );
 
-    res.send(
+    res.status(200).send(
       "pong"
     );
   }
 );
+
+// ============================================================
+// KEEPALIVE
+// ============================================================
 
 app.get(
   "/keepalive",
@@ -2981,23 +2981,27 @@ app.get(
     );
 
     res.status(200).json({
-      ok: true,
-      service: "minecraft-bot-dashboard",
-      uptime: Math.floor(process.uptime())
+
+      success:
+        true,
+
+      message:
+        "Backend is awake",
+
+      service:
+        "minecraft-bot-dashboard",
+
+      uptime:
+        Math.floor(
+          process.uptime()
+        ),
+
+      timestamp:
+        new Date().toISOString()
+
     });
   }
 );
-// ============================================================
-// HEALTH CHECK ROUTE
-// ============================================================
-
-app.get("/health", (req, res) => {
-  res.status(200).json({
-    success: true,
-    message: "Server is healthy",
-    timestamp: new Date().toISOString()
-  });
-});
 
 // ============================================================
 // COMMAND PARSER
@@ -3048,9 +3052,6 @@ function parseCommand(
 
   /*
    * /status Chomubot
-   *
-   * Works only if that name exists
-   * on exactly one server.
    */
 
   } else if (
@@ -3498,25 +3499,38 @@ app.post(
       state.manualStop =
         false;
 
-      const started = await startBot(
-        state
-      );
+      const started =
+        await startBot(
+          state
+        );
 
-      return res.status(started || state.bot || state.connecting ? 200 : 503).json({
+      return res
+        .status(
+          started ||
+          state.bot ||
+          state.connecting
+            ? 200
+            : 503
+        )
+        .json({
 
-        success:
-          Boolean(started || state.bot || state.connecting),
+          success:
+            Boolean(
+              started ||
+              state.bot ||
+              state.connecting
+            ),
 
-        msg:
-          started
-            ? `${state.serverName} / ${state.botName} start requested.`
-            : state.bot
-              ? `${state.serverName} / ${state.botName} is already running.`
-              : state.connecting
-                ? `${state.serverName} / ${state.botName} is already connecting.`
-                : `${state.serverName} / ${state.botName} could not start; check logs.`
+          msg:
+            started
+              ? `${state.serverName} / ${state.botName} start requested.`
+              : state.bot
+                ? `${state.serverName} / ${state.botName} is already running.`
+                : state.connecting
+                  ? `${state.serverName} / ${state.botName} is already connecting.`
+                  : `${state.serverName} / ${state.botName} could not start; check logs.`
 
-      });
+        });
     }
 
     // --------------------------------------------------------
@@ -3915,6 +3929,28 @@ to reduce resource usage.
 
 </div>
 
+<div class="card">
+
+<h2>
+UptimeRobot / Health
+</h2>
+
+<p>
+Use the following health endpoint with
+UptimeRobot:
+</p>
+
+<pre>
+/health
+</pre>
+
+<p>
+The endpoint returns a lightweight
+HTTP 200 JSON response.
+</p>
+
+</div>
+
 </main>
 
 </body>
@@ -3989,6 +4025,17 @@ process.on(
 
 // ============================================================
 // HTTP SERVER
+// ============================================================
+//
+// IMPORTANT:
+// There is ONLY ONE app.listen() in this file.
+//
+// Render needs:
+//   0.0.0.0
+//
+// and the PORT supplied through:
+//   process.env.PORT
+//
 // ============================================================
 
 const server =
@@ -4115,12 +4162,18 @@ async function shutdown(
   ).unref();
 }
 
-// Wispbyte/hosted panels generally use SIGTERM
-// for graceful shutdown. SIGINT is not trapped here.
 process.once(
   "SIGTERM",
   () =>
     shutdown(
       "SIGTERM"
+    )
+);
+
+process.once(
+  "SIGINT",
+  () =>
+    shutdown(
+      "SIGINT"
     )
 );
