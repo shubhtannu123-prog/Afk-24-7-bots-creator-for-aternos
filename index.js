@@ -3004,14 +3004,23 @@ app.get("/keepalive", (req, res) => {
   });
 });
 // ============================================================
-// Health checkup jugad
+// HEALTH CHECK ROUTE
 // ============================================================
+
 app.get("/health", (req, res) => {
-res.status(200).json({
-success: true,
-message: "Server is healthy",
-timestamp: new Date().toISOString(),
+  res.status(200).json({
+    success: true,
+    message: "Server is healthy",
+    timestamp: new Date().toISOString()
+  });
 });
+
+// ============================================================
+// START SERVER
+// ============================================================
+
+app.listen(PORT, () => {
+  log(`Express server running on port ${PORT}`);
 });
 // ============================================================
 // COMMAND PARSER
