@@ -2091,9 +2091,7 @@ const options = {
         Math.max(
           2,
           Number(
-            config.performance?.viewDistance
-          ) || 2
-        ),
+            config.performance?.viewDistance) || 2),
 
       physicsEnabled:
         config.performance
@@ -2101,9 +2099,7 @@ const options = {
         false,
 
       chatLog:
-        false,
-
-      connectTimeout:
+        false,  connectTimeout:
         Math.max(
           5000,
           Number(
