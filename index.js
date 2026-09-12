@@ -2066,7 +2066,6 @@ async function startBot(
     log(
       `[${state.serverName}] [${state.botName}] connecting to ${state.host}:${state.port}...`
     );
-
 const options = {
   host: state.host,
   port: state.port,
@@ -2074,101 +2073,31 @@ const options = {
   auth: state.auth,
   version: state.version,
   password: state.password || undefined,
-  
-  // Timeout & Keepalive adjustments for Render
-  checkTimeoutInterval: 60000, // Increase from 30s to 60s
-  keepAlive: true,             // Enable TCP keep-alive packets
-  
-  viewDistance: Math.max(2, Number(config.performance?.viewDistance) || 2),
-  physicsEnabled: config.performance?.physicsEnabled !== false,
+
+  viewDistance: Math.max(
+    2,
+    Number(config.performance?.viewDistance) || 2
+  ),
+
+  physicsEnabled:
+    config.performance?.physicsEnabled !== false,
+
   chatLog: false,
+
+  connectTimeout: Math.max(
+    5000,
+    Number(config.performance?.connectTimeout) || 30000
+  ),
+
+  checkTimeoutInterval: Math.max(
+    5000,
+    Number(config.performance?.checkTimeoutInterval) || 30000
+  ),
+
+  keepAlive: true,
+
+  hideErrors: false
 };
-      // ------------------------------------------------------
-      // WISPBYTE MEMORY PROTECTION
-      // ------------------------------------------------------
-
-      viewDistance:
-        Math.max(
-          2,
-          Number(
-            config.performance?.viewDistance) || 2),
-
-      physicsEnabled:
-        config.performance
-          ?.physicsEnabled !==
-        false,
-
-      chatLog:
-        false,  connectTimeout:
-        Math.max(
-          5000,
-          Number(
-            config.performance?.connectTimeout
-          ) || 30000
-        ),
-
-      checkTimeoutInterval:
-        Math.max(
-          5000,
-          Number(
-            config.performance?.checkTimeoutInterval
-          ) || 30000
-        ),
-
-      hideErrors:
-        false
-    };
-
-    const bot =
-      mineflayer.createBot(
-        options
-      );
-
-    state.bot =
-      bot;
-
-    bot.loadPlugin(
-      pathfinder
-    );
-
-    registerEvents(
-      state,
-      bot,
-      generation
-    );
-
-    return true;
-
-  } catch (error) {
-
-    state.bot =
-      null;
-
-    rememberError(
-      state,
-      error
-    );
-
-    log(
-      `[${state.serverName}] [${state.botName}] start failed: ${
-        error?.message ||
-        error
-      }`
-    );
-
-    scheduleReconnect(
-      state,
-      "start failed"
-    );
-
-    return false;
-
-  } finally {
-
-    state.connecting =
-      false;
-  }
-}
 
 // ============================================================
 // STOP BOT
