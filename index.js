@@ -2066,39 +2066,115 @@ async function startBot(
     log(
       `[${state.serverName}] [${state.botName}] connecting to ${state.host}:${state.port}...`
     );
-const options = {
-  host: state.host,
-  port: state.port,
-  username: state.botName,
-  auth: state.auth,
-  version: state.version,
-  password: state.password || undefined,
 
-  viewDistance: Math.max(
-    2,
-    Number(config.performance?.viewDistance) || 2
-  ),
+    const options = {
 
-  physicsEnabled:
-    config.performance?.physicsEnabled !== false,
+      host:
+        state.host,
 
-  chatLog: false,
+      port:
+        state.port,
 
-  connectTimeout: Math.max(
-    5000,
-    Number(config.performance?.connectTimeout) || 30000
-  ),
+      username:
+        state.botName,
 
-  checkTimeoutInterval: Math.max(
-    5000,
-    Number(config.performance?.checkTimeoutInterval) || 30000
-  ),
+      auth:
+        state.auth,
 
-  keepAlive: true,
+      version:
+        state.version,
 
-  hideErrors: false
-};
+      password:
+        state.password ||
+        undefined,
 
+      viewDistance:
+        Math.max(
+          2,
+          Number(
+            config.performance?.viewDistance
+          ) || 2
+        ),
+
+      physicsEnabled:
+        config.performance?.physicsEnabled !== false,
+
+      chatLog:
+        false,
+
+      connectTimeout:
+        Math.max(
+          5000,
+          Number(
+            config.performance?.connectTimeout
+          ) || 30000
+        ),
+
+      checkTimeoutInterval:
+        Math.max(
+          5000,
+          Number(
+            config.performance?.checkTimeoutInterval
+          ) || 30000
+        ),
+
+      keepAlive:
+        true,
+
+      hideErrors:
+        false
+    };
+
+    const bot =
+      mineflayer.createBot(
+        options
+      );
+
+    state.bot =
+      bot;
+
+    bot.loadPlugin(
+      pathfinder
+    );
+
+    registerEvents(
+      state,
+      bot,
+      generation
+    );
+
+    return true;
+
+  } catch (error) {
+
+    state.bot =
+      null;
+
+    rememberError(
+      state,
+      error
+    );
+
+    log(
+      `[${state.serverName}] [${state.botName}] start failed: ${
+        error?.message ||
+        error
+      }`
+    );
+
+    scheduleReconnect(
+      state,
+      "start failed"
+    );
+
+    return false;
+
+  } finally {
+
+    state.connecting =
+      false;
+  }
+}
 // ============================================================
 // STOP BOT
 // ============================================================
